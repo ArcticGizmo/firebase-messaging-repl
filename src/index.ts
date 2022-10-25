@@ -2,12 +2,17 @@ import './env';
 import * as repl from 'repl';
 import * as fb from './firebase';
 import type { Context } from 'vm';
+import { exit } from 'process';
 
 const clear = () => {
   process.stdout.write('\u001B[2J\u001B[0;0f');
 };
 
-// A "local" node repl with a custom prompt
+const SPECIAL_KEYWORDS = [
+  { key: 'clear', call: clear },
+  { key: 'exit', call: () => exit(0) }
+];
+
 const local = repl.start({ prompt: 'fb:messaging> ' });
 
 const oldEval = local.eval;
@@ -18,6 +23,13 @@ function newEval(
   filename: string,
   callback: (err: Error | null, result: any) => void
 ) {
+  for (const special of SPECIAL_KEYWORDS) {
+    if (cmd.startsWith(special.key)) {
+      special.call();
+      return;
+    }
+  }
+
   if (!cmd.startsWith('fb')) {
     oldEval.call(this, ...arguments);
     return;
@@ -37,5 +49,4 @@ Object.defineProperty(local, 'eval', {
   value: newEval
 });
 
-local.context.clear = clear;
 local.context.fb = fb;
