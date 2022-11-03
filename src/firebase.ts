@@ -15,6 +15,12 @@ import glob from 'glob';
 
 type NotificationData = { [key: string]: string };
 type Recipient = { token: string } | { topic: string } | { condition: string };
+type LocaleData = {
+  titleKey?: string;
+  titleArgs?: string[];
+  bodyKey?: string;
+  bodyArgs?: string[];
+};
 
 const TOKEN_ALIASES = {} as Record<string, string>;
 const SERVICE_ACCOUNTS = loadServiceAccounts();
@@ -122,13 +128,25 @@ class Chainable {
   private _recipient?: Recipient;
   private _notification?: Notification;
   private _data?: NotificationData;
+  private _localData?: LocaleData;
 
   async send() {
-    const msg = {
+    const msg: Message = {
       ...this._recipient,
       notification: this._notification,
       data: this._data
     };
+
+    if (this._localData) {
+      msg.android = {
+        notification: {
+          titleLocKey: this._localData.titleKey,
+          titleLocArgs: this._localData.titleArgs,
+          bodyLocKey: this._localData.bodyKey,
+          bodyLocArgs: this._localData.bodyArgs
+        }
+      };
+    }
 
     return send(msg);
   }
@@ -153,6 +171,7 @@ class Chainable {
   }
 
   setNotification(title?: string, body?: string, imageUrl?: string) {
+    this._localData = undefined;
     this._notification = {
       title,
       body,
@@ -161,7 +180,31 @@ class Chainable {
     return this;
   }
 
-  setData(data: NotificationData) {}
+  setLocaleTitle(key?: string, args?: string[]) {
+    this.setLocaleData(key, args, this._localData?.bodyKey, this._localData?.bodyArgs);
+    return this;
+  }
+
+  setLocaleBody(key?: string, args?: string[]) {
+    this.setLocaleData(this._localData?.titleKey, this._localData?.titleArgs, key, args);
+    return this;
+  }
+
+  setLocaleData(titleKey?: string, titleArgs?: string[], bodyKey?: string, bodyArgs?: string[]) {
+    this._notification = undefined;
+    this._localData = {
+      titleKey,
+      titleArgs,
+      bodyKey,
+      bodyArgs
+    };
+    return this;
+  }
+
+  setData(data: NotificationData) {
+    this._data = data;
+    return;
+  }
 
   addData(key: string, value: string) {
     if (!this._data) {
