@@ -16,5 +16,5 @@ benchmarks/graphs
 # https://git-scm.com/docs/gitignore
 
 .env.*local
-service-account.json
+*.sa.json
 registration.json

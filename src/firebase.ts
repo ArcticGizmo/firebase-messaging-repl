@@ -1,5 +1,5 @@
-import { applicationDefault, initializeApp } from 'firebase-admin/app';
-import type { App, AppOptions } from 'firebase-admin/app';
+import { applicationDefault, initializeApp, deleteApp } from 'firebase-admin/app';
+import type { App, AppOptions, ServiceAccount } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import * as fs from 'fs';
 import type {
@@ -10,19 +10,68 @@ import type {
   BaseMessage,
   Notification
 } from 'firebase-admin/messaging';
+import { credential } from 'firebase-admin';
+import glob from 'glob';
 
 type NotificationData = { [key: string]: string };
 type Recipient = { token: string } | { topic: string } | { condition: string };
 
 const TOKEN_ALIASES = {} as Record<string, string>;
+const SERVICE_ACCOUNTS = loadServiceAccounts();
 
-const config: AppOptions = {
-  credential: applicationDefault(),
-  projectId: process.env['FIREBASE_PROJECT_ID']
-};
+let app: App;
+let messaging: Messaging;
 
-const app = initializeApp(config);
-const messaging = getMessaging(app);
+const defaultCertName = process.env['DEFAULT_SERVICE_ACCOUNT_NAME'];
+let cert = SERVICE_ACCOUNTS[process.env['DEFAULT_SERVICE_ACCOUNT_NAME']];
+
+if (!cert) {
+  console.log(
+    `Could not find service account for default '${defaultCertName}'. The first available will be used`
+  );
+  cert = Object.values(SERVICE_ACCOUNTS)[0];
+}
+
+if (!cert) {
+  throw new Error('Could not find any service accounts. Terminiating');
+}
+
+createApp(cert);
+
+function createApp(account: ServiceAccount) {
+  const config: AppOptions = {
+    credential: credential.cert(account),
+    projectId: account.projectId
+  };
+
+  if (app) {
+    deleteApp(app);
+  }
+
+  app = initializeApp(config);
+  messaging = getMessaging(app);
+}
+
+function loadServiceAccounts() {
+  return glob.sync('**/*.sa.json', {}).reduce((acc, path) => {
+    try {
+      const raw = JSON.parse(fs.readFileSync(path).toString());
+      const serviceAccount = {
+        projectId: raw.project_id,
+        clientEmail: raw.client_email,
+        privateKey: raw.private_key
+      };
+
+      const name = path.replace('.sa.json', '');
+      acc[name] = serviceAccount;
+      acc[serviceAccount.projectId] = serviceAccount;
+    } catch (error) {
+      console.log(`Unable to load '${path}', check if a valid json file`);
+    }
+
+    return acc;
+  }, {} as Record<string, ServiceAccount>);
+}
 
 export const send = async (message: Message) => {
   return messaging.send(message);
@@ -123,3 +172,18 @@ class Chainable {
     return this;
   }
 }
+
+export const getProjectId = () => app.options.projectId;
+
+export const getAccounts = () => Object.keys(SERVICE_ACCOUNTS);
+
+export const setProject = (aliasOrProjectId: string) => {
+  const account = SERVICE_ACCOUNTS[aliasOrProjectId];
+
+  if (!account) {
+    console.log(`No account found for alias/projectID ${aliasOrProjectId}`);
+    return;
+  }
+
+  createApp(account);
+};

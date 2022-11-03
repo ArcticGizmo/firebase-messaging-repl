@@ -13,7 +13,7 @@ const SPECIAL_KEYWORDS = [
   { key: 'exit', call: () => exit(0) }
 ];
 
-const local = repl.start({ prompt: 'fb:messaging> ' });
+const local = repl.start({ prompt: `fb:${fb.getProjectId()}> ` });
 
 const oldEval = local.eval;
 
@@ -50,3 +50,8 @@ Object.defineProperty(local, 'eval', {
 });
 
 local.context.fb = fb;
+local.context.accounts = () => fb.getAccounts();
+local.context.setAccount = (aliasOrProjectId: string) => {
+  fb.setProject(aliasOrProjectId);
+  local.setPrompt(`fb:${fb.getProjectId()}> `);
+};

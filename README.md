@@ -2,7 +2,9 @@
 A simple reply 
 
 # Setup
-You will need to download the `service-account.json` file from your firebaes project and put it at the root of the project. This can be found via
+You will need to download the `service-account.json` file from your firebase project and put it at the root of the project with a name like `{alias}.sa.json`. You can have mutliple service accounts and can switch between them inside the REPL. 
+
+This file can be found via
 * open [Cloud Messaging](https://console.firebase.google.com/u/0/project/_/settings/cloudmessaging)
 * click `Manage Service Accounts`
 * click the tree dots under `actions` for your account
